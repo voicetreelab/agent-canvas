@@ -181,13 +181,11 @@ export class TerminalHoverEditorPositioning {
         };
 
         const onGraphChange = () => {
-            if (!updatePending) {
-                updatePending = true;
-                requestAnimationFrame(() => {
-                    updatePosition();
-                    updatePending = false;
-                });
-            }
+            updatePending = true;
+            requestAnimationFrame(() => {
+                updatePosition();
+                updatePending = false;
+            });
         };
 
         const pollForDrag = () => {
@@ -243,16 +241,20 @@ export class TerminalHoverEditorPositioning {
         containerResizeObserver = new ResizeObserver(() => {
             cachedContainerRect = cy.container().getBoundingClientRect();
             lastRectUpdate = Date.now();
-            // Immediately update position when container moves
-            updatePosition();
+            // Schedule update position to avoid resize loop
+            requestAnimationFrame(() => {
+                updatePosition();
+            });
         });
         
         // Update cache on window resize
         windowResizeHandler = () => {
             cachedContainerRect = cy.container().getBoundingClientRect();
             lastRectUpdate = Date.now();
-            // Immediately update position when window resizes
-            updatePosition();
+            // Schedule update position to avoid potential issues
+            requestAnimationFrame(() => {
+                updatePosition();
+            });
         };
 
         this.trackingMap.set(terminalId, cleanup);
