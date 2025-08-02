@@ -101,8 +101,101 @@ interface HoverEditorState {
     height: number;
 }
 
+interface TrackedEditor {
+    node: NodeSingular;
+    popoverEl: HTMLElement;
+    state: HoverEditorState;
+    resizeObserver: ResizeObserver;
+    mutationObserver: MutationObserver;
+    containerResizeObserver: ResizeObserver;
+    windowResizeHandler: () => void;
+    dragPollInterval: number;
+    onGraphChange: () => void;
+}
+
 export class TerminalHoverEditorPositioning {
-    private trackingMap: Map<string, () => void> = new Map();
+    private trackingMap: Map<string, TrackedEditor> = new Map();
+    private static updatePending = false;
+    private static sharedRAFId: number | null = null;
+    private static instances: TerminalHoverEditorPositioning[] = [];
+    
+    constructor() {
+        TerminalHoverEditorPositioning.instances.push(this);
+    }
+    
+    /**
+     * Shared update function that implements read/write separation
+     */
+    private static sharedUpdate() {
+        // Collect all editors from all instances
+        const allEditors: Array<{editor: TrackedEditor, instance: TerminalHoverEditorPositioning}> = [];
+        for (const instance of TerminalHoverEditorPositioning.instances) {
+            instance.trackingMap.forEach((editor) => {
+                allEditors.push({editor, instance});
+            });
+        }
+        
+        if (allEditors.length === 0) {
+            TerminalHoverEditorPositioning.updatePending = false;
+            return;
+        }
+        
+        // READ PHASE - Read all DOM values first
+        const firstEditor = allEditors[0].editor;
+        const cy = firstEditor.node.cy();
+        const zoom = cy.zoom();
+        const containerRect = cy.container().getBoundingClientRect();
+        
+        const updates: Array<{
+            popoverEl: HTMLElement,
+            x: number,
+            y: number,
+            width: number,
+            height: number
+        }> = [];
+        
+        // Read all node positions and calculate final positions
+        allEditors.forEach(({editor}) => {
+            const nodeBoundingBox = editor.node.renderedBoundingBox();
+            const nodeViewportX = containerRect.left + nodeBoundingBox.x1;
+            const nodeViewportY = containerRect.top + nodeBoundingBox.y1;
+            
+            const screenOffsetX = graphToScreen(editor.state.offsetX, zoom);
+            const screenOffsetY = graphToScreen(editor.state.offsetY, zoom);
+            
+            updates.push({
+                popoverEl: editor.popoverEl,
+                x: nodeViewportX + screenOffsetX,
+                y: nodeViewportY + screenOffsetY,
+                width: graphToScreen(editor.state.width, zoom),
+                height: graphToScreen(editor.state.height, zoom)
+            });
+        });
+        
+        // WRITE PHASE - Apply all updates at once
+        updates.forEach(update => {
+            update.popoverEl.style.position = 'fixed';
+            update.popoverEl.style.left = `${update.x}px`;
+            update.popoverEl.style.top = `${update.y}px`;
+            update.popoverEl.style.width = `${update.width}px`;
+            update.popoverEl.style.height = `${update.height}px`;
+            update.popoverEl.style.zIndex = '1000';
+        });
+        
+        TerminalHoverEditorPositioning.updatePending = false;
+    }
+    
+    /**
+     * Schedule a shared update for all editors
+     */
+    private static scheduleSharedUpdate() {
+        if (!TerminalHoverEditorPositioning.updatePending) {
+            TerminalHoverEditorPositioning.updatePending = true;
+            TerminalHoverEditorPositioning.sharedRAFId = requestAnimationFrame(() => {
+                TerminalHoverEditorPositioning.sharedUpdate();
+            });
+        }
+    }
 
     pinHoverEditorToNode(terminalId: string, node: NodeSingular, popoverEl: HTMLElement): void {
         if (this.trackingMap.has(terminalId)) {
@@ -143,11 +236,14 @@ export class TerminalHoverEditorPositioning {
         const initialScreenOffsetX = popoverRect.left - nodeViewportX;
         const initialScreenOffsetY = popoverRect.top - nodeViewportY;
 
+        // Apply 150% height multiplier for better visibility
+        const adjustedHeight = popoverEl.offsetHeight * 1.5;
+        
         const state: HoverEditorState = {
             offsetX: screenToGraph(initialScreenOffsetX, initialZoom),
             offsetY: screenToGraph(initialScreenOffsetY, initialZoom),
             width: screenToGraph(popoverEl.offsetWidth, initialZoom),
-            height: screenToGraph(popoverEl.offsetHeight, initialZoom),
+            height: screenToGraph(adjustedHeight, initialZoom),
         };
 
         // 2. CORE UPDATE AND EVENT LISTENER FUNCTIONS
@@ -181,11 +277,7 @@ export class TerminalHoverEditorPositioning {
         };
 
         const onGraphChange = () => {
-            updatePending = true;
-            requestAnimationFrame(() => {
-                updatePosition();
-                updatePending = false;
-            });
+            TerminalHoverEditorPositioning.scheduleSharedUpdate();
         };
 
         const pollForDrag = () => {
@@ -241,42 +333,61 @@ export class TerminalHoverEditorPositioning {
         containerResizeObserver = new ResizeObserver(() => {
             cachedContainerRect = cy.container().getBoundingClientRect();
             lastRectUpdate = Date.now();
-            // Schedule update position to avoid resize loop
-            requestAnimationFrame(() => {
-                updatePosition();
-            });
+            // Use shared update to avoid resize loop
+            TerminalHoverEditorPositioning.scheduleSharedUpdate();
         });
         
         // Update cache on window resize
         windowResizeHandler = () => {
             cachedContainerRect = cy.container().getBoundingClientRect();
             lastRectUpdate = Date.now();
-            // Schedule update position to avoid potential issues
-            requestAnimationFrame(() => {
-                updatePosition();
-            });
+            // Use shared update
+            TerminalHoverEditorPositioning.scheduleSharedUpdate();
         };
 
-        this.trackingMap.set(terminalId, cleanup);
+        // Store the tracked editor
+        const trackedEditor: TrackedEditor = {
+            node,
+            popoverEl,
+            state,
+            resizeObserver,
+            mutationObserver,
+            containerResizeObserver,
+            windowResizeHandler,
+            dragPollInterval: 0, // Will be set below
+            onGraphChange
+        };
+        
+        this.trackingMap.set(terminalId, trackedEditor);
         resizeObserver.observe(popoverEl);
         mutationObserver.observe(document.body, { childList: true, subtree: true });
         containerResizeObserver.observe(cy.container());
         window.addEventListener('resize', windowResizeHandler);
         
-        updatePosition();
+        // Initial position update using shared update
+        TerminalHoverEditorPositioning.scheduleSharedUpdate();
         cy.on('viewport', onGraphChange);
         node.on('position', onGraphChange);
-        dragPollInterval = window.setInterval(pollForDrag, 200);
+        trackedEditor.dragPollInterval = window.setInterval(pollForDrag, 200);
     }
 
     cleanup(terminalId: string): void {
-        const cleanupFn = this.trackingMap.get(terminalId);
-        if (cleanupFn) {
-            cleanupFn();
+        const trackedEditor = this.trackingMap.get(terminalId);
+        if (trackedEditor) {
+            const cy = trackedEditor.node.cy();
+            cy.off('viewport', trackedEditor.onGraphChange);
+            trackedEditor.node.off('position', trackedEditor.onGraphChange);
+            trackedEditor.resizeObserver.disconnect();
+            trackedEditor.mutationObserver.disconnect();
+            trackedEditor.containerResizeObserver.disconnect();
+            window.removeEventListener('resize', trackedEditor.windowResizeHandler);
+            clearInterval(trackedEditor.dragPollInterval);
+            this.trackingMap.delete(terminalId);
         }
     }
 
     cleanupAll(): void {
-        this.trackingMap.forEach(cleanupFn => cleanupFn());
+        const ids = Array.from(this.trackingMap.keys());
+        ids.forEach(id => this.cleanup(id));
     }
 }
