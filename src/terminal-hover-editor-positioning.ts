@@ -41,8 +41,8 @@
  *     node's rendered coordinates to get the node's true position relative to the viewport.
  *
  * GOTCHA #2: Stuttering / Jank on Zoom ("Layout Thrashing")
- *   - PROBLEM: When multiple editors were open, zooming became choppy and slow.
- *   - ROOT CAUSE & solution: not yet known
+ *   - PROBLEM: When hover editors are open, zooming become choppy and slow.
+ *   - ROOT CAUSE & solution: not yet known (zoom events dropped or queing up?)
 
  * GOTCHA #3: Inferring User Drag vs. Graph Movement
  *   - PROBLEM: How do you know if the editor's position changed because the user dragged it,
@@ -118,6 +118,8 @@ export class TerminalHoverEditorPositioning {
     private static updatePending = false;
     private static sharedRAFId: number | null = null;
     private static instances: TerminalHoverEditorPositioning[] = [];
+    private static cachedContainerRect: DOMRect | null = null;
+    private static containerObserver: ResizeObserver | null = null;
     
     constructor() {
         TerminalHoverEditorPositioning.instances.push(this);
@@ -144,7 +146,20 @@ export class TerminalHoverEditorPositioning {
         const firstEditor = allEditors[0].editor;
         const cy = firstEditor.node.cy();
         const zoom = cy.zoom();
-        const containerRect = cy.container().getBoundingClientRect();
+        
+        // Use cached container rect or get it once
+        if (!TerminalHoverEditorPositioning.cachedContainerRect) {
+            TerminalHoverEditorPositioning.cachedContainerRect = cy.container().getBoundingClientRect();
+            
+            // Set up observer if not already done
+            if (!TerminalHoverEditorPositioning.containerObserver) {
+                TerminalHoverEditorPositioning.containerObserver = new ResizeObserver(() => {
+                    TerminalHoverEditorPositioning.cachedContainerRect = cy.container().getBoundingClientRect();
+                });
+                TerminalHoverEditorPositioning.containerObserver.observe(cy.container());
+            }
+        }
+        const containerRect = TerminalHoverEditorPositioning.cachedContainerRect;
         
         const updates: Array<{
             popoverEl: HTMLElement,
@@ -237,7 +252,7 @@ export class TerminalHoverEditorPositioning {
         const initialScreenOffsetY = popoverRect.top - nodeViewportY;
 
         // Apply 150% height multiplier for better visibility
-        const adjustedHeight = popoverEl.offsetHeight * 1.5;
+        const adjustedHeight = popoverEl.offsetHeight;
         
         const state: HoverEditorState = {
             offsetX: screenToGraph(initialScreenOffsetX, initialZoom),
@@ -389,5 +404,19 @@ export class TerminalHoverEditorPositioning {
     cleanupAll(): void {
         const ids = Array.from(this.trackingMap.keys());
         ids.forEach(id => this.cleanup(id));
+        
+        // Clean up static resources if this was the last instance
+        const index = TerminalHoverEditorPositioning.instances.indexOf(this);
+        if (index > -1) {
+            TerminalHoverEditorPositioning.instances.splice(index, 1);
+        }
+        
+        if (TerminalHoverEditorPositioning.instances.length === 0) {
+            if (TerminalHoverEditorPositioning.containerObserver) {
+                TerminalHoverEditorPositioning.containerObserver.disconnect();
+                TerminalHoverEditorPositioning.containerObserver = null;
+            }
+            TerminalHoverEditorPositioning.cachedContainerRect = null;
+        }
     }
 }

@@ -456,7 +456,7 @@ echo "────────────────────────�
                         console.log('[Juggl Debug] Searched for selectors:', selectors);
                         console.log('[Juggl Debug] All popovers in DOM:', document.querySelectorAll('.popover'));
                     }
-                }, 300); // 300ms delay to allow terminal to render
+                }, 600); // 300ms delay to allow terminal to render
                 
                 // If we have a node, try to pin the hover editor to it
                 if (node) {
