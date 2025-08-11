@@ -295,23 +295,29 @@ export class Juggl extends Component implements IJuggl {
           }
         });
         this.viz.on('dragfree', (e) => {
+          console.log('[VoiceTree] dragfree event triggered');
           if (!e.target) {
+            console.log('[VoiceTree] No target in dragfree event');
             return;
           }
-          if (this.activeLayout) {
-            this.activeLayout.stop();
-          }
+          // Commented out to prevent layout restart after dragging
+          // if (this.activeLayout) {
+          //   this.activeLayout.stop();
+          // }
           // this.activeLayout = this.viz.layout(this.colaLayout()).start();
           // Note: This does restart the layout, but it's intentional for drag behavior
           // The current drag behavior is acceptable, so we're keeping this as-is
-          this.activeLayout.start();
+          // this.activeLayout.start();
           const node = e.target;
-          node.lock();
-          this.activeLayout.one('layoutstop', (e) => {
-            if (!node.hasClass(CLASS_PINNED)) {
-              node.unlock();
-            }
-          });
+          console.log('[VoiceTree] Node dragged:', node.id(), 'Pinned:', node.hasClass(CLASS_PINNED));
+          
+          // Run local elasticity effect if enabled and node has neighbors
+          if (!node.hasClass(CLASS_PINNED)) {
+            console.log('[VoiceTree] Calling runLocalColaLayout for node:', node.id());
+            this.runLocalColaLayout(node);
+          } else {
+            console.log('[VoiceTree] Node is pinned, skipping local elasticity');
+          }
         });
         this.viz.on('cxttap', (e) => {
           // Thanks Liam for sharing how to do context menus
@@ -593,6 +599,68 @@ export class Juggl extends Component implements IJuggl {
       
       // Check if intersection point is within both line segments
       return t >= 0 && t <= 1 && u >= 0 && u <= 1;
+    }
+
+    private runLocalColaLayout(draggedNode: NodeSingular): void {
+      console.log('[VoiceTree] runLocalColaLayout called for node:', draggedNode.id());
+      
+      // Get immediate neighbors (parents and children)
+      const neighbors = draggedNode.neighborhood().nodes();
+      console.log('[VoiceTree] Number of neighbors:', neighbors.length);
+      console.log('[VoiceTree] enableLocalElasticity setting:', (this.settings as any).enableLocalElasticity);
+      
+      // Skip if no neighbors or if settings explicitly disable it
+      if (neighbors.length === 0 || (this.settings as any).enableLocalElasticity === false) {
+        console.log('[VoiceTree] Skipping local elasticity - no neighbors or disabled in settings');
+        return;
+      }
+      
+      // Lock ALL nodes first (including the dragged node)
+      this.viz.nodes().lock();
+      
+      // Then unlock ONLY the neighbors (not the dragged node)
+      neighbors.forEach(node => {
+        node.unlock();
+      });
+      
+      // Keep the dragged node locked at its new position
+      draggedNode.lock();
+      
+      console.log('[VoiceTree] Locked all nodes, unlocked only neighbors');
+      
+      // Run micro-layout with constrained settings
+      const localLayout = this.viz.layout({
+        name: 'cola',
+        maxSimulationTime: 300,    // Short burst (300ms)
+        centerGraph: false,        // Don't recenter
+        fit: false,               // Don't adjust viewport
+        animate: true,            // Show the elastic animation
+        randomize: false,         // Keep existing positions
+        avoidOverlap: true,       // Maintain spacing
+        handleDisconnected: true,
+        nodeSpacing: 10,
+        refresh: 2,               // Same as global settings
+        convergenceThreshold: 0.01, // When to stop the simulation
+        flow: null,               // No directional bias
+        alignment: null,          // No alignment constraints
+        gapInequalities: null,    // No gap constraints
+        
+        // Cleanup callback
+        stop: () => {
+          console.log('[VoiceTree] Local cola layout completed');
+          // Unlock all nodes when done
+          this.viz.nodes().unlock();
+          
+          // Re-lock pinned nodes (they should stay locked)
+          this.getPinned().lock();
+          
+          // The dragged node is now free to be dragged again
+          // but it will stay at its new position
+        }
+      });
+      
+      console.log('[VoiceTree] Starting local cola layout');
+      localLayout.run();
     }
 
     assignStyleGroups() {

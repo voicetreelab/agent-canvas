@@ -75,32 +75,88 @@ export class WorkspaceMode extends Component implements IAGMode {
         console.log('[Juggl Debug] Context menu for node:', id.storeId, id.id);
         
         if (id.storeId === 'core') {
+          // Terminal option
           commands.push({
-            content: pathToSvg(icons.ag_file),
-            select: async function(ele: NodeSingular, gestureStart: any, event: Event) {
-              // @ts-ignore
-              await plugin.openFileFromNode(ele, event.originalEvent.metaKey);
-            },
-            enabled: true,
-          });
-          
-          // Add "Spawn Terminal" option for markdown nodes
-          commands.push({
-            content: 'Terminal', // Plain text instead of emoji
+            content: 'Terminal',
             select: async function(ele: NodeSingular) {
               console.log('[Juggl Debug] Terminal option clicked for:', id.id);
-              // Spawn terminal connected to this markdown file
               await plugin.terminalStore.spawnTerminalForFile(id.id, ele);
             },
             enabled: true,
           });
-          console.log('[Juggl Debug] Added Terminal option to core node commands');
+          
+          // Hide option
+          commands.push({
+            content: pathToSvg(icons.ag_hide),
+            select: function(ele: NodeSingular) {
+              mode.removeNodes(ele);
+            },
+            enabled: true,
+          });
+          
+          // Lock/Pin option
+          if (n.hasClass(CLASS_PINNED)) {
+            commands.push({
+              content: pathToSvg(icons.ag_unlock),
+              select: function(ele: NodeSingular) {
+                mode.unpin(ele);
+              },
+              enabled: true,
+            });
+          } else {
+            commands.push({
+              content: pathToSvg(icons.ag_lock),
+              select: function(ele: NodeSingular) {
+                mode.pin(ele);
+              },
+              enabled: true,
+            });
+          }
+          
+          // GEMINI option
+          commands.push({
+            content: 'GEMINI',
+            select: async function(ele: NodeSingular) {
+              console.log('[Juggl Debug] GEMINI option clicked for:', id.id);
+              await plugin.terminalStore.spawnTerminalForFile(id.id, ele, { agent: 'gemini' });
+            },
+            enabled: true,
+          });
+          
+          // CLAUDE option
+          commands.push({
+            content: 'CLAUDE',
+            select: async function(ele: NodeSingular) {
+              console.log('[Juggl Debug] CLAUDE option clicked for:', id.id);
+              await plugin.terminalStore.spawnTerminalForFile(id.id, ele, { agent: 'claude' });
+            },
+            enabled: true,
+          });
+          
+          // Expand/Collapse option
+          if (n.hasClass(CLASS_EXPANDED)) {
+            commands.push({
+              content: pathToSvg(icons.ag_collapse),
+              select: function(ele: NodeSingular) {
+                mode.removeNodes(ele);
+              },
+              enabled: true,
+            });
+          } else {
+            commands.push({
+              content: pathToSvg(icons.ag_expand),
+              select: function(ele: NodeSingular) {
+                view.expand(ele);
+              },
+              enabled: true,
+            });
+          }
         }
         
         // Terminal node specific commands
         if (id.storeId === 'terminal') {
           commands.push({
-            content: 'Open Terminal', // Plain text instead of emoji
+            content: 'Open Terminal',
             select: async function(ele: NodeSingular, gestureStart: any, event: Event) {
               console.log('[Juggl Debug] Open Terminal clicked for:', id.id);
               // @ts-ignore
@@ -110,66 +166,15 @@ export class WorkspaceMode extends Component implements IAGMode {
           });
           
           commands.push({
-            content: 'Hover Editor', // Plain text instead of emoji
+            content: 'Hover Editor',
             select: async function(ele: NodeSingular) {
               console.log('[Juggl Debug] Hover Editor clicked for:', id.id);
-              // Convert terminal to hover editor
               await plugin.terminalStore.convertTerminalToHoverEditor(id.id, ele);
             },
             enabled: true,
           });
-          console.log('[Juggl Debug] Added terminal node context menu options');
         }
 
-        commands.push(
-            {
-              content: pathToSvg(icons.ag_hide),
-              select: function(ele: NodeSingular) {
-                mode.removeNodes(ele);
-              },
-              enabled: true,
-            },
-            {
-              content: pathToSvg(icons.ag_fit),
-              select: function(ele: NodeSingular) {
-                mode.updateActiveNode(ele, true);
-              },
-              enabled: true, // whether the command is selectable
-            });
-        if (n.hasClass(CLASS_PINNED)) {
-          commands.push({
-            content: pathToSvg(icons.ag_unlock),
-            select: function(ele: NodeSingular) {
-              mode.unpin(ele);
-            },
-            enabled: true, // whether the command is selectable
-          });
-        } else {
-          commands.push({
-            content: pathToSvg(icons.ag_lock),
-            select: function(ele: NodeSingular) {
-              mode.pin(ele);
-            },
-            enabled: true, // whether the command is selectable
-          });
-        }
-        if (n.hasClass(CLASS_EXPANDED)) {
-          commands.push({
-            content: pathToSvg(icons.ag_collapse),
-            select: function(ele: NodeSingular) {
-              mode.removeNodes(ele);
-            },
-            enabled: true, // whether the command is selectable
-          });
-        } else {
-          commands.push({
-            content: pathToSvg(icons.ag_expand),
-            select: function(ele: NodeSingular) {
-              view.expand(ele);
-            },
-            enabled: true, // whether the command is selectable
-          });
-        }
         return commands;
       }, // function( ele ){ return [ /*...*/ ] }, // a function that returns commands or a promise of commands
       fillColor: `${backgroundColor}`, // the background colour of the menu

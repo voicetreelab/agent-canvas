@@ -174,6 +174,7 @@ export const DefaultJugglSettings: IJugglPluginSettings = {
     toolbar: true,
     width: '100%',
     zoomSpeed: 1,
+    enableLocalElasticity: true,
   },
   embedSettings: {
     animateLayout: true,
@@ -183,6 +184,7 @@ export const DefaultJugglSettings: IJugglPluginSettings = {
     coreStore: OBSIDIAN_STORE_NAME,
     expandInitial: true,
     fdgdLayout: 'cola',
+    enableLocalElasticity: true,
     filter: '',
     height: '400px',
     hoverEdges: false,
@@ -197,6 +199,7 @@ export const DefaultJugglSettings: IJugglPluginSettings = {
     toolbar: false,
     width: '100%',
     zoomSpeed: 1,
+    enableLocalElasticity: true,
   },
   globalGraphSettings: {
     animateLayout: true,
@@ -220,6 +223,7 @@ export const DefaultJugglSettings: IJugglPluginSettings = {
     styleGroups: [],
     toolbar: true,
     zoomSpeed: 1,
+    enableLocalElasticity: true,
   },
 };
 

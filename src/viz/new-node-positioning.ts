@@ -54,7 +54,7 @@ export function findOptimalPosition(parentNode: any, newNode: any): {x: number, 
   }
   
   // Place node at the best angle, 93 units away
-  const distance = 93;
+  const distance = 143;
   const position = {
     x: parentPos.x + Math.cos(bestAngle) * distance,
     y: parentPos.y + Math.sin(bestAngle) * distance
@@ -100,12 +100,33 @@ export function setInitialNodePositions(
       // No parent found - use last parent if available
       if (lastParentNode && viz.$id(lastParentNode.id()).length > 0) {
         const position = findOptimalPositionFn(lastParentNode, node);
+        
+        // Add randomness for orphans (up to ±93 units in each direction)
+        position.x += (Math.random() - 0.5) * 2 * 123;
+        position.y += (Math.random() - 0.5) * 2 * 123;
+        
         node.position(position);
-        console.log(`[Juggl Position Debug] No parent found for ${node.id()}, placed near last parent ${lastParentNode.id()}`);
+        console.log(`[Juggl Position Debug] Orphan ${node.id()} placed near last parent ${lastParentNode.id()} with randomness`);
       } else {
-        // No last parent available - place at origin
-        node.position({ x: 0, y: 0 });
-        console.log(`[Juggl Position Debug] No parent found for ${node.id()} and no previous parent, placed at origin`);
+        // No last parent available - place randomly near center of mass
+        const existingNodes = viz.nodes().difference(newNodes);
+        let centerX = 0, centerY = 0;
+        
+        if (existingNodes.length > 0) {
+          existingNodes.forEach(n => {
+            const pos = n.position();
+            centerX += pos.x;
+            centerY += pos.y;
+          });
+          centerX /= existingNodes.length;
+          centerY /= existingNodes.length;
+        }
+        
+        node.position({ 
+          x: centerX + (Math.random() - 0.5) * 186, 
+          y: centerY + (Math.random() - 0.5) * 186 
+        });
+        console.log(`[Juggl Position Debug] Orphan ${node.id()} placed randomly near center of mass (${centerX.toFixed(0)}, ${centerY.toFixed(0)})`);
       }
     }
   });
