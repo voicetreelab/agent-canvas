@@ -1,4 +1,4 @@
-# VoiceTree UI
+# Agent Canvas, the VoiceTree UI
 
 A graph-based visualization interface for VoiceTree that enables interactive canvas environments for terminal and coding agents.
 
