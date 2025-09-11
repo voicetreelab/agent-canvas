@@ -9,9 +9,11 @@ A graph-based visualization interface for VoiceTree that enables interactive can
 - **Interactive Graph Visualization**: Built on Cytoscape.js and juggl-ui for powerful graph manipulation
 
 ## Installation
-
-Requires Obsidian with Terminal plugin already installed.
-
+Prerequisties:
+- Requires Obsidian with the following two plugiins:
+  - Terminal plugin. https://github.com/polyipseity/obsidian-terminal
+  - Hover Editor plugiin. https://github.com/nothingislost/obsidian-hover-editor
+ 
 ```bash
 cd juggl-main
 ./build.sh
