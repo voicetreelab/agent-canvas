@@ -16,7 +16,7 @@ export const icons: Record<string, string> = {
   ag_select_neighbors: mdiIcons.mdiSelectGroup,
   ag_lock: mdiIcons.mdiLock,
   ag_unlock: mdiIcons.mdiLockOpenVariantOutline,
-  ag_hide: mdiIcons.mdiEyeOff,
+  ag_hide: mdiIcons.mdiTrashCan,
   ag_unhide: mdiIcons.mdiEye,
   ag_fit: mdiIcons.mdiFitToPageOutline,
   ag_image: mdiIcons.mdiImage,

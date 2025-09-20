@@ -37,6 +37,7 @@ export class WorkspaceMode extends Component implements IAGMode {
   recursionPreventer = false;
   menu: any;
   private breathingAnimationManager: BreathingAnimationManager;
+  private previousLastNode: NodeSingular | null = null;
   
   constructor(view: Juggl) {
     super();
@@ -88,8 +89,8 @@ export class WorkspaceMode extends Component implements IAGMode {
           // Hide option
           commands.push({
             content: pathToSvg(icons.ag_hide),
-            select: function(ele: NodeSingular) {
-              mode.removeNodes(ele);
+            select: async function(ele: NodeSingular) {
+              await mode.removeNodes(ele);
             },
             enabled: true,
           });
@@ -137,8 +138,8 @@ export class WorkspaceMode extends Component implements IAGMode {
           if (n.hasClass(CLASS_EXPANDED)) {
             commands.push({
               content: pathToSvg(icons.ag_collapse),
-              select: function(ele: NodeSingular) {
-                mode.removeNodes(ele);
+              select: async function(ele: NodeSingular) {
+                await mode.removeNodes(ele);
               },
               enabled: true,
             });
@@ -294,30 +295,29 @@ export class WorkspaceMode extends Component implements IAGMode {
       });
     };
 
-    // Handle new nodes added animation
+    // Handle new nodes added animation, new nodes have animation with no timeout, previos node starts get given timeout.
     this.registerEvent(this.view.on('newNodesAdded', (newNodes) => {
       console.log('[Juggl] Handling breathing animation for newly added nodes:', newNodes.length);
-      
-      newNodes.forEach((node: NodeSingular) => {
-        // Add render event listener for debugging
-        node.cy().one('render', () => {
-          console.log(`[Juggl] Render event fired for node ${node.id()} - checking style:`, {
-            borderWidth: node.style('border-width'),
-            borderColor: node.style('border-color'),
-            backgroundColor: node.style('background-color')
-          });
-        });
-        
-        // Wait for node styling then add animation
-        waitForNodeStyling(node).then(() => {
-          // Only add animation if the node doesn't already have one
-          if (!this.breathingAnimationManager.isAnimationActive(node)) {
-            console.log('[Juggl] Adding breathing animation for new node:', node.id());
-            console.log('[Juggl] Node style check - border-width:', node.style('border-width'), 'background-color:', node.style('background-color'));
-            this.breathingAnimationManager.addBreathingAnimation(this.viz.collection(node), AnimationType.NEW_NODE);
-          }
-        });
+
+      // Step 1: Give previous last node a 10s timeout (if exists)
+      if (this.previousLastNode && this.breathingAnimationManager.isAnimationActive(this.previousLastNode)) {
+        console.log('[Juggl] Adding timeout to previous last node:', this.previousLastNode.id());
+        this.breathingAnimationManager.addTimeoutToExistingAnimation(this.previousLastNode, 10000);
+      }
+
+      // Step 2: Add new node with persistent animation (no timeout)
+      const lastNewNode = newNodes[newNodes.length - 1];
+
+      // Wait for node styling then add persistent animation
+      waitForNodeStyling(lastNewNode).then(() => {
+        if (!this.breathingAnimationManager.isAnimationActive(lastNewNode)) {
+          console.log('[Juggl] Adding persistent breathing animation for new last node:', lastNewNode.id());
+          this.breathingAnimationManager.addBreathingAnimation(this.viz.collection(lastNewNode), AnimationType.NEW_NODE);
+        }
       });
+
+      // Step 3: Update tracking
+      this.previousLastNode = lastNewNode;
     }));
 
     this.windowEvent = async (evt: KeyboardEvent) => {
@@ -327,7 +327,7 @@ export class WorkspaceMode extends Component implements IAGMode {
       if (evt.key === 'e') {
         await this.expandSelection();
       } else if (evt.key === 'h' || evt.key === 'Backspace') {
-        this.removeSelection();
+        await this.removeSelection();
       } else if (evt.key === 'i') {
         this.invertSelection();
       } else if (evt.key === 'a') {
@@ -399,9 +399,9 @@ export class WorkspaceMode extends Component implements IAGMode {
             });
       });
       menu.addItem((item) => {
-        item.setTitle('Hide selection (H)').setIcon('ag-hide')
-            .onClick((evt) => {
-              this.removeNodes(nodes);
+        item.setTitle('Delete selection (H)').setIcon('ag-hide')
+            .onClick(async (evt) => {
+              await this.removeNodes(nodes);
             });
       });
       menu.addItem((item) =>{
@@ -534,14 +534,30 @@ export class WorkspaceMode extends Component implements IAGMode {
   collapseSelection() {
     this.collapse(this.viz.nodes(':selected'));
   }
-  removeNodes(nodes: NodeCollection) {
-    nodes.addClass(CLASS_HARD_FILTERED);
+  async removeNodes(nodes: NodeCollection) {
+    // Actually delete the markdown files and nodes instead of just hiding them
+    for (const node of nodes) {
+      const id = VizId.fromNode(node);
+      if (id.storeId === 'core') {
+        // Only delete files for core store nodes (actual markdown files)
+        const file = this.view.plugin.app.metadataCache.getFirstLinkpathDest(id.id, '');
+        if (file) {
+          try {
+            await this.view.plugin.app.vault.delete(file);
+          } catch (error) {
+            console.error('Failed to delete file:', file.path, error);
+          }
+        }
+      }
+    }
+    // Remove nodes from graph (this will happen automatically when files are deleted via vault events)
+    nodes.remove();
     this.view.onGraphChanged(true, true);
     this.view.trigger('hide', nodes);
     this.view.trigger('selectChange');
   }
-  removeSelection() {
-    this.removeNodes(this.viz.nodes(':selected'));
+  async removeSelection() {
+    await this.removeNodes(this.viz.nodes(':selected'));
   }
 
   selectAll() {

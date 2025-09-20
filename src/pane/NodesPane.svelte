@@ -19,9 +19,9 @@
             return;
         }
         viz = juggl;
-        // TODO: Can probably do something like not HARD FILTERED, rather than relying on styling.
+        // Since nodes are now deleted instead of hidden, there are no hidden nodes
         visible = viz.viz.nodes(":visible");
-        hidden = viz.viz.nodes(`.${CLASS_HARD_FILTERED}`);
+        hidden = cytoscape().collection(); // Always empty since we delete nodes instead of hiding
     }
     let ctxMenu = function(node: NodeSingular, e: MouseEvent) {
         const fileMenu = new Menu(); // Creates empty file menu
@@ -38,8 +38,9 @@
         viz.plugin.openFileFromNode(node, e.metaKey);
     }
     let filterButtonClick = function(node: NodeSingular) {
-        node.removeClass(CLASS_HARD_FILTERED);
-        viz.onGraphChanged(true, true);
+        // No longer needed since nodes are deleted instead of hidden
+        // node.removeClass(CLASS_HARD_FILTERED);
+        // viz.onGraphChanged(true, true);
     }
 </script>
 

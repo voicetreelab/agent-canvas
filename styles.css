@@ -176,7 +176,7 @@ edge[edgeCount] {
     margin: 2px;
     margin-block-start: 0;
     margin-block-end: 0;
-    z-index: 1000;
+    z-index: 10;
     background-color: rgba(0, 0, 0, 0);
 }
 

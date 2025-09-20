@@ -27,8 +27,12 @@ npm run build
 
 # Copy files to vault
 echo "Copying files to vault..."
-cp main.js manifest.json styles.css ../repos/VoiceTree/markdownTreeVault/.obsidian/plugins/juggl/
-cp main.js manifest.json styles.css ../repos/VoiceTree/backend/benchmarker/output/.obsidian/plugins/juggl
-cp main.js manifest.json styles.css ../repos/VoiceTree/backend/benchmarker/output/voiceTree_clustering/.obsidian/plugins/juggl
+if [ -z "$VOICETREE_VAULT_PATH" ]; then
+    echo "Error: VOICETREE_VAULT_PATH environment variable is not set"
+    exit 1
+fi
+cp main.js manifest.json styles.css "$VOICETREE_VAULT_PATH/.obsidian/plugins/juggl/"
+#cp main.js manifest.json styles.css ../../repos/VoiceTree/backend/benchmarker/output/.obsidian/plugins/juggl # todo, juggl folder needs to be created first
+#cp main.js manifest.json styles.css ../repos/VoiceTree/backend/benchmarker/output/voiceTree_clustering/.obsidian/plugins/juggl
 
 echo "Build and deploy complete - FIXED VERSION v$NEW_VERSION"

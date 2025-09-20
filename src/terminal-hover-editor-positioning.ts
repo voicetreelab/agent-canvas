@@ -194,7 +194,8 @@ export class TerminalHoverEditorPositioning {
             update.popoverEl.style.top = `${update.y}px`;
             update.popoverEl.style.width = `${update.width}px`;
             update.popoverEl.style.height = `${update.height}px`;
-            update.popoverEl.style.zIndex = '1000';
+            // Removed hardcoded z-index to allow normal stacking behavior
+            // update.popoverEl.style.zIndex = '1000';
         });
         
         TerminalHoverEditorPositioning.updatePending = false;
@@ -288,7 +289,8 @@ export class TerminalHoverEditorPositioning {
             popoverEl.style.top = `${screenY}px`;
             popoverEl.style.width = `${screenWidth}px`;
             popoverEl.style.height = `${screenHeight}px`;
-            popoverEl.style.zIndex = '1000';
+            // Removed hardcoded z-index to allow normal stacking behavior
+            // popoverEl.style.zIndex = '1000';
         };
 
         const onGraphChange = () => {

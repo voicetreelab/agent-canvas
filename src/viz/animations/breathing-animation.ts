@@ -40,7 +40,7 @@ export class BreathingAnimationManager {
       }],
       [AnimationType.NEW_NODE, {
         duration: 1000,
-        timeout: 0, // No timeout for new nodes
+        timeout: 0, // No timeout by default - timeout added later via addTimeoutToExistingAnimation
         expandWidth: 4,
         expandColor: 'rgba(0, 255, 0, 0.9)', // Green for new nodes
         expandOpacity: 0.8,
@@ -254,10 +254,36 @@ export class BreathingAnimationManager {
     console.log(`[Juggl] Stopped breathing animation for node ${nodeId}`);
   }
 
+  public addTimeoutToExistingAnimation(node: NodeSingular, timeout: number): void {
+    const nodeId = node.id();
+
+    if (!this.isAnimationActive(node)) {
+      return;
+    }
+
+    console.log(`[Juggl] Adding ${timeout}ms timeout to existing animation for node ${nodeId}`);
+
+    // Set timeout to stop animation
+    const cy = node.cy();
+    const capturedNodeId = nodeId;
+
+    const newTimeout = setTimeout(() => {
+      console.log(`[Juggl] Timeout fired! Stopping animation for node ${capturedNodeId} after ${timeout}ms`);
+      const currentNode = cy.getElementById(capturedNodeId);
+      if (currentNode && currentNode.length > 0) {
+        this.stopAnimationForNode(currentNode);
+      } else {
+        this.stopAnimation(capturedNodeId);
+      }
+    }, timeout);
+
+    this.breathingTimeouts.set(nodeId, newTimeout);
+  }
+
   public stopAllAnimations(nodes: NodeCollection): void {
     nodes.forEach((node) => {
       this.stopAnimationForNode(node);
-      
+
       // Clean up data
       node.removeData('breathingActive originalBorderWidth originalBorderColor originalBorderOpacity');
     });
