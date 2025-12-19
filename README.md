@@ -2,6 +2,8 @@
 
 A graph-based visualization interface for VoiceTree that enables interactive canvas environments for terminal and coding agents.
 
+NOTE: this project has since involved into https://voicetree.io 
+
 ## Features
 
 - **Agent Node Canvas**: Visual representation of terminal and coding agents as interactive nodes on a graph
